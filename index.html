@@ -1,29 +1,57 @@
 <!doctype html>
-<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow,noarchive"><title>Travel Journal</title>
-<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#F1F6FA;color:#44504E;font:15px/1.6 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;text-align:center;padding:24px;box-sizing:border-box}
-@media (prefers-color-scheme:dark){body{background:#0E1716;color:#C0CCCA}}</style></head>
-<body><p id="m">불러오는 중…</p>
+<style>
+:root{--bg:#F1F6FA;--paper:#fff;--ink:#1A1F24;--ink3:#7D8690;--line:#DCE5EC;--accent:#0E6E6B;--bad:#C23B3B}
+@media (prefers-color-scheme:dark){:root{--bg:#0E1716;--paper:#152120;--ink:#E9F0EE;--ink3:#86938F;--line:#273634;--accent:#6CC9C2;--bad:#EE8B85}}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;min-height:100dvh;display:grid;place-items:center;background:var(--bg);color:var(--ink);font:16px/1.6 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;padding:24px 16px}
+form{width:100%;max-width:340px;background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:26px 22px 22px;box-shadow:0 10px 30px -14px rgba(20,40,60,.25)}
+.k{font-size:11.5px;font-weight:700;letter-spacing:.16em;color:var(--ink3)}
+h1{font-size:21px;margin:6px 0 4px;letter-spacing:-.02em}
+p{margin:0 0 16px;font-size:14px;color:var(--ink3)}
+input{width:100%;height:48px;border:1px solid var(--line);border-radius:10px;padding:0 14px;font-size:17px;background:var(--bg);color:var(--ink)}
+input:focus{outline:2px solid var(--accent);outline-offset:1px}
+button{width:100%;height:48px;margin-top:10px;border:0;border-radius:10px;background:var(--accent);color:#fff;font-size:16px;font-weight:700}
+button:disabled{opacity:.6}
+.e{min-height:22px;margin:8px 0 0;font-size:13.5px;color:var(--bad)}
+</style></head>
+<body><form id="f" autocomplete="on">
+<div class="k">TRAVEL JOURNAL</div><h1>비밀번호를 입력해 주세요</h1><p>한 번 열면 이 기기에서는 다음부터 바로 열려요.</p>
+<input id="pw" type="password" name="password" autocomplete="current-password" enterkeyhint="go" placeholder="비밀번호" aria-label="비밀번호" required>
+<button id="go" type="submit">열기</button><div class="e" id="e" role="alert"></div>
+</form>
 <script>
+const ITER = 310000, SK = 'dxb-key';
+const b64 = u => btoa(String.fromCharCode(...u)), unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+let BIN = null;
+async function bin(){ if(!BIN){ const r = await fetch('site.bin', {cache:'no-cache'}); if(!r.ok) throw new Error('net'); BIN = new Uint8Array(await r.arrayBuffer()); } return BIN; }
+async function open_(raw){
+  const b = await bin();
+  const key = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['decrypt']);
+  const plain = await crypto.subtle.decrypt({name:'AES-GCM', iv:b.slice(16, 28)}, key, b.slice(28));
+  const html = new TextDecoder().decode(plain);
+  if(location.hash) history.replaceState(null, '', location.pathname);
+  document.open(); document.write(html); document.close();
+}
+async function derive(pw){
+  const b = await bin();
+  const km = await crypto.subtle.importKey('raw', new TextEncoder().encode(pw), 'PBKDF2', false, ['deriveBits']);
+  return new Uint8Array(await crypto.subtle.deriveBits({name:'PBKDF2', salt:b.slice(0, 16), iterations:ITER, hash:'SHA-256'}, km, 256));
+}
 (async () => {
-  const say = t => { document.getElementById('m').textContent = t; };
-  const h = location.hash.match(/k=([A-Za-z0-9_-]{30,})/);
-  let k = h ? h[1] : null;
-  try { if (k) localStorage.setItem('dxb-k', k); else k = localStorage.getItem('dxb-k'); } catch (e) {}
-  if (!k) { say('처음 받은 링크(끝에 #k=… 가 붙은 주소) 그대로 열어 주세요.'); return; }
-  try {
-    const res = await fetch('site.bin', {cache: 'no-cache'});
-    if (!res.ok) throw new Error('파일을 못 받았어요 (' + res.status + ')');
-    const buf = new Uint8Array(await res.arrayBuffer());
-    const raw = Uint8Array.from(atob(k.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((k.length + 3) % 4)), c => c.charCodeAt(0));
-    const key = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['decrypt']);
-    const plain = await crypto.subtle.decrypt({name: 'AES-GCM', iv: buf.slice(0, 12)}, key, buf.slice(12));
-    if (h) history.replaceState(null, '', location.pathname);
-    const html = new TextDecoder().decode(plain);
-    document.open(); document.write(html); document.close();
-  } catch (e) {
-    try { if (!h) localStorage.removeItem('dxb-k'); } catch (_) {}
-    say('열 수 없어요. 받은 링크 전체로 다시 열어 주세요.');
-  }
+  let saved = null; try{ saved = localStorage.getItem(SK); }catch(e){}
+  if(saved){ try{ await open_(unb64(saved)); return; }catch(e){ try{ localStorage.removeItem(SK); }catch(_){} } }
+  document.getElementById('pw').focus();
 })();
+document.getElementById('f').addEventListener('submit', async e => {
+  e.preventDefault();
+  const go = document.getElementById('go'), er = document.getElementById('e'), pw = document.getElementById('pw').value;
+  if(!pw) return;
+  go.disabled = true; go.textContent = '여는 중…'; er.textContent = '';
+  let raw;
+  try{ raw = await derive(pw); }catch(x){ er.textContent = '파일을 못 받았어요. 인터넷 연결을 확인해 주세요.'; go.disabled = false; go.textContent = '열기'; return; }
+  try{ await open_(raw); try{ localStorage.setItem(SK, b64(raw)); }catch(_){} }
+  catch(x){ er.textContent = '비밀번호가 달라요. 다시 입력해 주세요.'; go.disabled = false; go.textContent = '열기'; document.getElementById('pw').select(); }
+});
 </script></body></html>
