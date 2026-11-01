@@ -32,6 +32,7 @@ async function open_(raw){
   const plain = await crypto.subtle.decrypt({name:'AES-GCM', iv:b.slice(16, 28)}, key, b.slice(28));
   const html = new TextDecoder().decode(plain);
   if(location.hash) history.replaceState(null, '', location.pathname);
+  try{ sessionStorage.setItem('dxb-k', b64(raw)); }catch(_){}
   document.open(); document.write(html); document.close();
 }
 async function derive(pw){
